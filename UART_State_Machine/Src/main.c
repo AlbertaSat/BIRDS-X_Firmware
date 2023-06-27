@@ -23,7 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #define BUFFER_SIZE 100
-
+#define CHECK_FOR_BEG_CHAR(value) ((value) == 0x21)
+#define CHECK_FOR_END_CHAR(value) ((value) == 0x3B)
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,7 +34,7 @@ typedef enum {
     WAIT,
     READY,
     RECIEVING,
-    FINISHED,
+    //ACKNOWLEDGE,
 } State;
 
 /* USER CODE END PTD */
@@ -61,17 +62,19 @@ static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
-volatile char  RX1[BUFFER_SIZE];
+volatile char  RX1;
 
 volatile char commandBuffer[BUFFER_SIZE];
 volatile uint8_t cmndindex = 0;
 volatile uint8_t rx2CompleteFlag = 0;
+volatile uint8_t newcmndCompleteFlag = 0;
 volatile State currentState = WAIT;
+volatile uint8_t count = 0;
 
 
 
 
-uint8_t TX1[17] = "UART1 Initialized";
+uint8_t TX1[BUFFER_SIZE] = "UART1 Initialized.\n";
 
 /* USER CODE END PFP */
 
@@ -79,68 +82,89 @@ uint8_t TX1[17] = "UART1 Initialized";
 /* USER CODE BEGIN 0 */
 void HAL_UART_RxCpltCallback (UART_HandleTypeDef * huart)
 {
-	//HAL_UART_Transmit(&huart1, RX, 5,1000);
-	//uint8_t RX[50] = {0};
+
 if (huart->Instance == USART1) {
-	//HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
-	//HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_6);
-	static uint8_t count = 0;
+	//static uint8_t count = 0;
 	switch(currentState)
 	{
 	case WAIT:
-		if(RX1[count] == 0x21 )
+		if(CHECK_FOR_BEG_CHAR(RX1))
 		{
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_RESET);
 			currentState = READY;
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
-			count++;
+			//count++;
 		}
 		else
 		{
 			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
-			count++;
+			//count++;
 		}
 		break;
 	case READY:
-		if(RX1[count] == 0x3B)
+		if(CHECK_FOR_END_CHAR(RX1))
+			{
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
+				currentState = WAIT;
+				cmndindex = 0;
+				count = 0;
+				rx2CompleteFlag = 1;
+				return;
+			}
+			else if(CHECK_FOR_BEG_CHAR(RX1))
+			{
+				currentState = READY;
+
+			}
+			else
+			{
+				currentState = RECIEVING;
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+				HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+				cmndindex = 0;
+				commandBuffer[cmndindex] = RX1;
+				//count++;
+				cmndindex++;
+			}
+
+		break;
+	case RECIEVING:
+		if(CHECK_FOR_END_CHAR(RX1))
 		{
-			currentState = FINISHED;
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
+			currentState = WAIT;
 			cmndindex = 0;
-			count = 0;
+			//count = 0;
 			rx2CompleteFlag = 1;
+			return;
+		}
+		else if(CHECK_FOR_BEG_CHAR(RX1))
+		{
+			currentState = READY;
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+			cmndindex = 0;
+			//count = 0;
+			//newcmndCompleteFlag = 1;
+			//memset(RX1, 0, sizeof(RX1));
+			memset(commandBuffer, 0, sizeof(commandBuffer));
+			  //currentState = RECIEVING;
+			//HAL_UART_Receive_IT(&huart1, (uint8_t *)RX1, 1);
+			//return;
+
 		}
 		else
 		{
 			currentState = RECIEVING;
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
-			cmndindex = 0;
-			commandBuffer[cmndindex] = RX1[count];
-			count++;
-			cmndindex++;
-		}
-		break;
-	case RECIEVING:
-		if(RX1[count] == 0x3B)
-		{
-			currentState = FINISHED;
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
-			HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_SET);
-			cmndindex = 0;
-			count = 0;
-			rx2CompleteFlag = 1;
-		}
-		else
-		{
-			commandBuffer[cmndindex] = RX1[count];
-			count++;
+			commandBuffer[cmndindex] = RX1;
+			//count++;
 			cmndindex++;
 		}
 		break;
 	}
-	HAL_UART_Receive_IT(&huart1, (uint8_t *)&RX1[count], 1);
+	HAL_UART_Receive_IT(&huart1,&RX1, 1);
 }
 
 
@@ -156,8 +180,6 @@ if (huart->Instance == USART1) {
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-	//uint8_t data[13] = "Hello World!\n";
-	//uint8_t RX[50] = {0};
 
   /* USER CODE END 1 */
 
@@ -167,7 +189,7 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  char transmitBuffer[BUFFER_SIZE];
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -182,7 +204,7 @@ int main(void)
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  HAL_UART_Receive_IT(&huart1, (uint8_t *)RX1, 1);
+  HAL_UART_Receive_IT(&huart1,&RX1, 1);
   HAL_UART_Transmit(&huart1, (uint8_t *)TX1, strlen(TX1), 1000);
   currentState = WAIT;
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
@@ -197,15 +219,14 @@ int main(void)
 	  if(rx2CompleteFlag)
 	  {
 		  rx2CompleteFlag = 0;
+		  sprintf(transmitBuffer, "The number of bytes in message packets is : %d\n", strlen(commandBuffer));
+		  strcat(commandBuffer, "\n");
 		  HAL_UART_Transmit(&huart1, (uint8_t *)commandBuffer, strlen(commandBuffer), 1000);
+		  HAL_UART_Transmit(&huart1, (uint8_t *)transmitBuffer, strlen(transmitBuffer), 1000);
 		  memset(RX1, 0, sizeof(RX1));
 		  memset(commandBuffer, 0, sizeof(commandBuffer));
 		  currentState = WAIT;
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_2, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_9, GPIO_PIN_SET);
-
-		  //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
-		  //HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+		  HAL_UART_Receive_IT(&huart1, &RX1, 1);
 	  }
     /* USER CODE BEGIN 3 */
   }
