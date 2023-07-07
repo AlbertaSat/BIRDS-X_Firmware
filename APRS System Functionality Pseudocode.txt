@@ -1,0 +1,167 @@
+// APRS System Functionality Pseudocode
+// I don't really know how to write pseudocode tho so :/
+
+// Enum APRSMode
+typedef enum {
+    APRS_MODE_DIGIPEATER,
+    APRS_MODE_STORE_FORWARD,
+    APRS_MODE_EXPERIMENTAL
+} APRSMode;
+
+APRSMode getAPRSMode();
+void runAPRSDigipeaterMode();
+void runAPRSStoreForwardMode();
+void runExperimentalDataCollectionMode();
+
+
+int main(){
+	while (1) {
+		APRSMode currentMode = getAPRSMode();
+		
+		switch (currentMode) {
+		
+			// APRS Digipeater Mode
+			case APRS_MODE_DIGIPEATER:
+				runAPRSDigipeaterMode();
+				break;
+			
+			// APRS Store-and-Forward Mode
+			case APRS_MODE_STORE_FORWARD:
+				runAPRSStoreForwardMode();
+				break;
+				
+			// Experimental Data Collection Mode
+			case APRS_MODE_EXPERIMENTAL:
+				runExperimentalDataCollectionMode();
+				break;
+				
+			// Invalid mode, handle error or default behavior
+			default:
+				handleInvalidMode();
+				break;
+		}
+	}
+	
+	return 0;
+}
+
+// APRS Digipeater Mode Function
+void runAPRSDigipeaterMode() {
+	// Check if data packet is received via UART from MTT4B
+	if (isDataPacketReceived()) {
+		APRSPacket packet = receiveDataPacket();
+
+		// Send packet back to Earth
+		sendPacketToEarth(packet);
+
+		// Copy packet to MCU over UART bus
+		copyPacketToMCU(packet);
+
+		// Parse packet for telecommands
+		Telecommand command = parseTelecommands(packet);
+
+		if (isValidCommand(command)) {
+			storePacketInFlashMemory(packet);
+
+			executeTelecommand(command);
+		}
+		else {
+			discardCopiedPacket();
+		}
+	}
+    
+}
+
+
+// APRS Store-and-Forward Mode Function
+void runAPRSStoreForwardMode() {
+	// Check if data packet is received via UART from MTT4B
+	if (isDataPacketReceived()) {
+		APRSPacket packet = receiveDataPacket(); 
+
+		// Parse packet for telecommands
+		Telecommand command = parseTelecommands(packet);
+
+		if (isCommandValid(command)) {
+			executeTelecommand(command);
+		}
+
+		storePacketInFlashMemory(packet);
+	}
+
+	// Check if request is received to retrieve packet from flash memory
+	if (isPacketRequestReceived()) {
+		APRSPacket requestedPacket = retrievePacketFromFlashMemory(); 
+		
+		sendPacketToMissionBoss(requestedPacket);
+	}
+	
+	// Check if request is received to re-transmit packet
+	if (isRetransmitRequestReceived()) {
+		APRSPacket retransmitPacket = retrievePacketFromFlashMemory(); 
+		
+		// Re-transmit packet
+		retransmitPacket(retransmitPacket);
+	}
+}
+
+// Configuration parameters
+struct ConfigurationParameters {
+    uint16_t cumulativeDosagePeriod;
+    uint16_t rollingAveragePeriods;
+    bool experimentEnabled;
+    bool storeIndividualMeasurements;
+};
+
+// Measurement data
+struct MeasurementData {
+    uint32_t timestamp;
+    float value;
+};
+
+// Circular buffer for measurements
+struct CircularBuffer {
+    MeasurementData buffer[MAX_BUFFER_SIZE];
+    uint16_t writeIndex;
+};
+
+void handleConfigurationTelecommand(char* parameter, char* value);
+
+void resetExperiment(char* experimentType);
+
+void downlinkCircularBuffer(char* experimentType);
+
+void downlinkStatisticalSummaries(char* experimentType, uint32_t minTimestamp, uint32_t maxTimestamp);
+
+void downlinkRawMeasurements(char* experimentType, uint32_t minTimestamp, uint32_t maxTimestamp);
+
+// APRS Experimental Data Collection Mode Function
+void runExperimentalDataCollectionMode() {
+	
+	CircularBuffer pinDiodeBuffer;
+	CircularBuffer radfetBuffer;
+	
+    initializeCircularBuffer(&pinDiodeBuffer);
+    initializeCircularBuffer(&radfetBuffer);
+
+	// I feel like this needs to be a loop but i'm not entirely sure how i
+	// would break out of it. maybe if the telecommand is to switch modes it 
+	// breaks out the loop? Regardless, constantly reinitializing the circular\
+	// buffer doesn't make sense so something will have to be changed here
+	
+	// Sample the PIN diode circuitry
+	samplePINdiode();
+
+	// Sample the RADFET circuitry
+	sampleRADFET();
+
+	// Handle received telecommands
+	if (isTelecommandReceived()) {
+		char telecommand[MAX_TELECOMMAND_SIZE];
+
+		parseReceivedTelecommand(telecommand);
+		handleReceivedTelecommand(telecommand);
+	}
+}
+
+
