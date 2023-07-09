@@ -19,6 +19,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "main_loop_controller.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -99,16 +100,16 @@ int main(void)
   MX_SPI2_Init();
   MX_USART1_UART_Init();
   MX_SPI1_Init();
+  
   /* USER CODE BEGIN 2 */
-
+  run_once_on_boot();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+  while (1) {
     /* USER CODE END WHILE */
-
+    main_loop();
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
